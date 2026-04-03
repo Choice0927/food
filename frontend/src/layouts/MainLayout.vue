@@ -1,71 +1,107 @@
 <script setup>
-import { computed } from 'vue'
+import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
+import { showConfirmDialog } from 'vant'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
-const appStore = useAppStore()
+const authStore = useAuthStore()
 
-const pageTitle = computed(() => route.meta.title || '美食旅行攻略')
+const activeTab = computed(() => {
+  const path = route.path
+  if (path === '/home' || path === '/') return 'home'
+  if (path === '/add') return 'add'
+  if (path === '/profile') return 'profile'
+  return 'home'
+})
 
-const goToPublish = () => {
-  router.push('/publish')
+const onTabChange = (index) => {
+  const tabs = ['home', 'add', 'profile']
+  const tab = tabs[index]
+  if (tab === 'add') {
+    router.push('/add')
+  } else {
+    router.push(`/${tab}`)
+  }
+}
+
+const onClickAdd = () => {
+  router.push('/add')
+}
+
+const onLogout = () => {
+  showConfirmDialog({
+    title: '退出登录',
+    message: '确定要退出登录吗？',
+  })
+    .then(() => {
+      authStore.clearAuth()
+      router.push('/login')
+    })
+    .catch(() => {})
 }
 </script>
 
 <template>
-  <div class="app-shell layout">
-    <van-nav-bar :title="pageTitle" fixed placeholder />
-
-    <main class="layout__content">
+  <div class="main-layout">
+    <main class="main-content">
       <router-view />
     </main>
 
-    <button class="layout__fab" type="button" aria-label="新增美食打卡占位按钮" @click="goToPublish">
-      <i class="fa-solid fa-plus"></i>
-    </button>
-
-    <van-tabbar route placeholder>
-      <van-tabbar-item
-        v-for="tab in appStore.tabs"
-        :key="tab.name"
-        :to="tab.path"
-      >
-        <span>{{ tab.label }}</span>
+    <van-tabbar v-model="activeTab" @change="onTabChange" class="tabbar">
+      <van-tabbar-item name="home" icon="home-o">
+        我的收藏
+      </van-tabbar-item>
+      <van-tabbar-item @click="onClickAdd">
         <template #icon>
-          <i :class="tab.icon"></i>
+          <div class="add-btn">
+            <van-icon name="plus" />
+          </div>
         </template>
+        <span class="add-text">添加</span>
+      </van-tabbar-item>
+      <van-tabbar-item name="profile" icon="user-o">
+        我的
       </van-tabbar-item>
     </van-tabbar>
   </div>
 </template>
 
 <style scoped>
-.layout {
-  position: relative;
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f8f8f8;
 }
 
-.layout__content {
-  padding: 16px 16px 24px;
+.main-content {
+  flex: 1 1 auto;
+  height: 200px;
+  padding: 16px;
 }
 
-.layout__fab {
-  position: fixed;
-  left: 50%;
-  bottom: 88px;
-  z-index: 20;
-  width: 56px;
-  height: 56px;
-  border: none;
+.tabbar {
+  --van-tabbar-item-active-color: #ff6b3d;
+}
+
+.add-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ff6b3d 0%, #ffb347 100%);
   border-radius: 50%;
-  color: #ffffff;
-  background: linear-gradient(135deg, #ff6b3d, #ffb347);
-  box-shadow: 0 8px 24px rgba(255, 107, 61, 0.28);
-  transform: translateX(-50%);
+  color: #fff;
+  font-size: 20px;
+  transform: translateY(-8px);
+  box-shadow: 0 4px 12px rgba(255, 107, 61, 0.4);
 }
 
-.layout__fab:active {
-  transform: translateX(-50%) scale(0.96);
+.add-text {
+  font-size: 12px;
+  color: #666;
 }
 </style>

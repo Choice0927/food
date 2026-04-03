@@ -1,16 +1,16 @@
 const mongoose = require('mongoose')
 
 const placeSchema = new mongoose.Schema({
-  userId: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    default: null,
+    required: true,
   },
   name: {
     type: String,
     required: true,
     trim: true,
-    maxlength: 100,
+    maxlength: 50,
   },
   city: {
     type: String,
@@ -24,25 +24,20 @@ const placeSchema = new mongoose.Schema({
     trim: true,
     maxlength: 255,
   },
-  latitude: {
-    type: Number,
-    default: null,
-  },
-  longitude: {
-    type: Number,
-    default: null,
+  location: {
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
   },
   description: {
     type: String,
     trim: true,
-    default: '',
-  },
-  notes: {
-    type: String,
-    trim: true,
-    default: '',
+    maxlength: 300,
   },
   images: {
+    type: [String],
+    default: [],
+  },
+  tags: {
     type: [String],
     default: [],
   },
@@ -52,36 +47,11 @@ const placeSchema = new mongoose.Schema({
     min: 0,
     max: 5,
   },
-  tags: {
-    type: [String],
-    default: [],
-  },
-  likesCount: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-  favoritesCount: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-  commentsCount: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-  checkinsCount: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-  likedBy: {
-    type: [mongoose.Schema.Types.ObjectId],
-    default: [],
-  },
 }, {
   timestamps: true,
 })
+
+placeSchema.index({ user: 1, createdAt: -1 })
+placeSchema.index({ city: 1 })
 
 module.exports = mongoose.model('Place', placeSchema)

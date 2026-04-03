@@ -1,16 +1,83 @@
 import { createApp } from 'vue'
-import Vant from 'vant'
-import '@fortawesome/fontawesome-free/css/all.min.css'
-import 'vant/lib/index.css'
-import './style.css'
 import App from './App.vue'
 import router from './router'
 import { pinia } from './stores'
 
+// Vant 组件库
+import {
+  Button,
+  Cell,
+  CellGroup,
+  Field,
+  Form,
+  Icon,
+  Image as VanImage,
+  List,
+  NavBar,
+  PullRefresh,
+  Rate,
+  Search,
+  Skeleton,
+  Tabbar,
+  TabbarItem,
+  Tag,
+  Toast,
+  Empty,
+  Picker,
+  Popup,
+  Swipe,
+  SwipeItem,
+  ImagePreview,
+  Dialog,
+  Checkbox,
+  Radio,
+  Uploader,
+} from 'vant'
+
+// Vant 样式
+import 'vant/lib/index.css'
+
+// 全局样式
+import './style.css'
+
 const app = createApp(App)
+
+// 注册 Vant 组件
+const vantComponents = [
+  Button,
+  Cell,
+  CellGroup,
+  Field,
+  Form,
+  Icon,
+  VanImage,
+  List,
+  NavBar,
+  PullRefresh,
+  Rate,
+  Search,
+  Skeleton,
+  Tabbar,
+  TabbarItem,
+  Tag,
+  Toast,
+  Empty,
+  Picker,
+  Popup,
+  Swipe,
+  SwipeItem,
+  ImagePreview,
+  Dialog,
+  Checkbox,
+  Radio,
+  Uploader,
+]
+
+vantComponents.forEach((component) => {
+  app.use(component)
+})
 
 app.use(pinia)
 app.use(router)
-app.use(Vant)
 
 app.mount('#app')

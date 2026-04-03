@@ -1,688 +1,378 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
-import { getPostsApi } from '@/api/posts'
-import { useFavoritesStore } from '@/stores/favorites'
+import { showFailToast, showConfirmDialog } from 'vant'
+import { usePlacesStore } from '@/stores/places'
 import { useAuthStore } from '@/stores/auth'
+import { deletePlaceApi } from '@/api/places'
 
 const router = useRouter()
-const favoritesStore = useFavoritesStore()
+const placesStore = usePlacesStore()
 const authStore = useAuthStore()
 
-const activeTab = ref('favorites')
-const posts = ref([])
 const loading = ref(false)
 const refreshing = ref(false)
 const finished = ref(false)
-const initialLoading = ref(true)
 const currentPage = ref(1)
-const pageSize = 6
+const pageSize = 10
+
 const searchKeyword = ref('')
+const selectedCity = ref('')
+const showCityPicker = ref(false)
 
-const showRandomDialog = ref(false)
-const randomPlace = ref(null)
+const cityColumns = computed(() => {
+  const cities = placesStore.cities.map(city => ({ text: city, value: city }))
+  return [{ text: '全部城市', value: '' }, ...cities]
+})
 
-const tabs = [
-  { name: 'favorites', label: '我的收藏' },
-  { name: 'nearby', label: '附近热门' },
-]
+const filteredPlaces = computed(() => {
+  let list = [...placesStore.places]
 
-const tagOptions = [
-  { text: '全部', value: '' },
-  { text: '火锅', value: '火锅' },
-  { text: '烧烤', value: '烧烤' },
-  { text: '小吃', value: '小吃' },
-  { text: '甜品', value: '甜品' },
-  { text: '咖啡', value: '咖啡' },
-  { text: '景点', 'value': '景点' },
-]
-
-const selectedTag = ref('')
-const showTagPicker = ref(false)
-
-const filteredPosts = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  const tag = selectedTag.value
-
-  let list = posts.value
-
-  if (tag) {
-    list = list.filter((item) => item.tags?.includes(tag))
+  if (selectedCity.value) {
+    list = list.filter(item => item.city === selectedCity.value)
   }
 
-  if (keyword) {
-    list = list.filter((item) =>
-      [item.name, item.city, item.description].some((field) =>
-        String(field || '')
-          .toLowerCase()
-          .includes(keyword),
-      ),
+  if (searchKeyword.value.trim()) {
+    const keyword = searchKeyword.value.trim().toLowerCase()
+    list = list.filter(item =>
+      item.name?.toLowerCase().includes(keyword) ||
+      item.address?.toLowerCase().includes(keyword) ||
+      item.tags?.some(tag => tag.toLowerCase().includes(keyword))
     )
   }
 
   return list
 })
 
-const buildCoverStyle = (post) => {
-  const image = post.images?.[0]
-
-  if (image) {
-    return {
-      backgroundImage: `url(${image})`,
-    }
-  }
-
-  return {
-    backgroundImage:
-      'linear-gradient(135deg, rgba(255, 107, 61, 0.18), rgba(255, 179, 71, 0.3))',
-  }
+const onCityConfirm = ({ selectedOptions }) => {
+  selectedCity.value = selectedOptions[0].value
+  showCityPicker.value = false
 }
 
-const fetchPosts = async ({ reset = false } = {}) => {
+const fetchPlaces = async (reset = false) => {
   if (reset) {
     currentPage.value = 1
     finished.value = false
   }
 
-  if (finished.value && !reset) {
-    return
-  }
+  if (finished.value && !reset) return
 
   loading.value = true
 
   try {
-    const { data } = await getPostsApi({
+    await placesStore.fetchPlaces({
+      city: selectedCity.value,
+      keyword: searchKeyword.value,
       page: currentPage.value,
-      limit: pageSize,
+      limit: pageSize
     })
 
-    const incomingList = data.list || []
-
-    if (reset) {
-      posts.value = incomingList
-    } else {
-      posts.value = [...posts.value, ...incomingList]
-    }
-
-    finished.value = !data.pagination?.hasMore
-
-    if (data.pagination?.hasMore) {
-      currentPage.value += 1
+    finished.value = placesStore.places.length < pageSize * currentPage.value
+    if (!finished.value) {
+      currentPage.value++
     }
   } catch (error) {
-    showFailToast(error.response?.data?.message || '获取美食列表失败')
-    finished.value = true
+    showFailToast('获取列表失败')
   } finally {
     loading.value = false
     refreshing.value = false
-    initialLoading.value = false
   }
 }
 
 const onRefresh = async () => {
   refreshing.value = true
-  await fetchPosts({ reset: true })
+  await fetchPlaces(true)
 }
 
 const onLoad = async () => {
-  await fetchPosts()
+  await fetchPlaces()
 }
 
-const openMap = () => {
-  showFailToast('地图功能开发中')
+const goToDetail = (id) => {
+  router.push(`/places/${id}`)
 }
 
-const onTabChange = async (name) => {
-  activeTab.value = name
-
-  if (name === 'favorites') {
-    await favoritesStore.fetchFavorites({ reset: true })
-    posts.value = favoritesStore.favorites
-  } else {
-    await fetchPosts({ reset: true })
-  }
+const goToEdit = (id, event) => {
+  event.stopPropagation()
+  router.push(`/edit/${id}`)
 }
 
-const onTagConfirm = ({ selectedOptions }) => {
-  selectedTag.value = selectedOptions[0].value
-  showTagPicker.value = false
-}
+const onDelete = async (id, event) => {
+  event.stopPropagation()
 
-const getRandomPlace = async () => {
   try {
-    const { data } = await getPostsApi('/places/random', {
-      params: {
-        city: selectedTag.value,
-      },
+    await showConfirmDialog({
+      title: '确认删除',
+      message: '确定要删除这个地点吗？此操作不可恢复。',
     })
 
-    randomPlace.value = data.place
-    showRandomDialog.value = true
+    await deletePlaceApi(id)
+    await placesStore.fetchPlaces({ reset: true })
+    showSuccessToast('删除成功')
   } catch (error) {
-    showFailToast(error.response?.data?.message || '随机推荐失败')
+    if (error !== 'cancel') {
+      showFailToast('删除失败')
+    }
   }
 }
 
-const onRandomPlaceAction = async (action) => {
-  if (action === 'navigate') {
-    showRandomDialog.value = false
-    router.push(`/places/${randomPlace.value.id}`)
-  } else if (action === 'checkin') {
-    showRandomDialog.value = false
-    router.push(`/places/${randomPlace.value.id}?action=checkin`)
-  } else if (action === 'reroll') {
-    await getRandomPlace()
-  }
-}
-
-const goToPlaceDetail = (placeId) => {
-  router.push(`/places/${placeId}`)
-}
-
-onMounted(async () => {
+onMounted(() => {
   if (authStore.isAuthenticated) {
-    await favoritesStore.fetchFavorites({ reset: true })
-    posts.value = favoritesStore.favorites
-  } else {
-    await fetchPosts({ reset: true })
+    fetchPlaces(true)
   }
 })
 </script>
 
 <template>
-  <section class="home-page">
-    <div class="home-page__toolbar">
-      <van-search
-        v-model="searchKeyword"
-        shape="round"
-        placeholder="搜索城市、店名或关键词"
-        class="home-page__search"
-      />
-
-      <button class="home-page__map-button" type="button" @click="openMap">
-        <i class="fa-solid fa-map-location-dot"></i>
-      </button>
-    </div>
-
-    <div class="home-page__random">
-      <button class="random-button" type="button" @click="getRandomPlace">
-        <i class="fa-solid fa-shuffle"></i>
-        <span>随缘一吃</span>
-      </button>
-    </div>
-
-    <div class="home-page__tabs">
-      <van-tabs v-model:active="activeTab" @change="onTabChange">
-        <van-tab
-          v-for="tab in tabs"
-          :key="tab.name"
-          :name="tab.name"
-          :title="tab.label"
+  <div class="home-page">
+    <!-- 固定的顶部搜索栏 -->
+    <div class="header">
+      <div class="search-bar">
+        <van-search
+          v-model="searchKeyword"
+          shape="round"
+          placeholder="搜索店名、地址或标签"
+          @search="fetchPlaces(true)"
         />
-      </van-tabs>
-    </div>
-
-    <div class="home-page__tags">
-      <van-tag
-        v-for="tag in tagOptions"
-        :key="tag.value"
-        :type="selectedTag === tag.value ? 'primary' : 'default'"
-        :plain="selectedTag !== tag.value"
-        @click="selectedTag = tag.value"
-      >
-        {{ tag.text }}
-      </van-tag>
-    </div>
-
-    <div v-if="initialLoading" class="skeleton-list">
-      <div v-for="index in 3" :key="index" class="skeleton-card">
-        <van-skeleton title avatar :row="3" :loading="true">
-          <template #template>
-            <div class="skeleton-card__cover"></div>
-            <div class="skeleton-card__body">
-              <van-skeleton-title class="skeleton-card__title" />
-              <van-skeleton-paragraph row-width="80%" />
-              <van-skeleton-paragraph row-width="55%" />
-            </div>
-          </template>
-        </van-skeleton>
+        <van-button 
+          size="small" 
+          type="primary" 
+          round
+          @click="showCityPicker = true"
+        >
+          {{ selectedCity || '城市' }}
+        </van-button>
       </div>
     </div>
 
-    <van-pull-refresh
-      v-else
-      v-model:refreshing="refreshing"
-      success-text="刷新成功"
-      @refresh="onRefresh"
-    >
+    <!-- 城市选择器 -->
+    <van-popup v-model:show="showCityPicker" position="bottom" round>
+      <van-picker
+        :columns="cityColumns"
+        @confirm="onCityConfirm"
+        @cancel="showCityPicker = false"
+      />
+    </van-popup>
+
+    <!-- 可滚动的地点列表区域 -->
+    <van-pull-refresh class="content" v-model="refreshing" @refresh="onRefresh">
       <van-list
         v-model:loading="loading"
         :finished="finished"
-        finished-text="没有更多美食内容了"
+        finished-text="没有更多了"
         @load="onLoad"
       >
-        <div v-if="filteredPosts.length" class="post-list">
-          <article
-            v-for="post in filteredPosts"
-            :key="post.id"
-            class="post-card"
-            @click="goToPlaceDetail(post.id)"
+        <div v-if="filteredPlaces.length" class="place-list">
+          <div
+            v-for="place in filteredPlaces"
+            :key="place._id"
+            class="place-card"
+            @click="goToDetail(place._id)"
           >
-            <div class="post-card__cover" :style="buildCoverStyle(post)">
-              <span class="post-card__city">{{ post.city }}</span>
-              <div v-if="post.isFavorited" class="post-card__favorited">
-                <i class="fa-solid fa-heart"></i>
+            <div class="place-cover">
+              <img v-if="place.images?.[0]" :src="place.images[0]" :alt="place.name">
+              <div v-else class="placeholder-cover">
+                <van-icon name="photo-o" size="32" />
               </div>
+              <span class="city-tag">{{ place.city }}</span>
             </div>
-
-            <div class="post-card__content">
-              <div class="post-card__header">
-                <h2>{{ post.name }}</h2>
-                <span>{{ new Date(post.createdAt).toLocaleDateString('zh-CN') }}</span>
-              </div>
-
-              <p class="post-card__desc">
-                {{ post.description || post.notes || '这家店值得收藏，后续可查看完整攻略详情。' }}
+            
+            <div class="place-info">
+              <h3 class="place-name">{{ place.name }}</h3>
+              <p class="place-address">
+                <van-icon name="location-o" />
+                {{ place.address }}
               </p>
-
-              <div class="post-card__footer">
-                <div class="post-card__location">
-                  <i class="fa-solid fa-location-dot"></i>
-                  <span>{{ post.address }}</span>
-                </div>
-
-                <div class="post-card__stats">
-                  <span>
-                    <i class="fa-regular fa-thumbs-up"></i>
-                    {{ post.likesCount }}
-                  </span>
-                  <span>
-                    <i class="fa-regular fa-bookmark"></i>
-                    {{ post.favoritesCount }}
-                  </span>
-                </div>
+              
+              <div class="place-tags" v-if="place.tags?.length">
+                <van-tag
+                  v-for="tag in place.tags.slice(0, 3)"
+                  :key="tag"
+                  type="primary"
+                  size="small"
+                  plain
+                >
+                  {{ tag }}
+                </van-tag>
+              </div>
+              
+              <div class="place-rating" v-if="place.rating > 0">
+                <van-rate
+                  :model-value="place.rating"
+                  readonly
+                  :size="12"
+                  color="#FFD21E"
+                />
               </div>
             </div>
-          </article>
+            
+            <div class="place-actions" @click.stop>
+              <van-button
+                size="small"
+                type="primary"
+                plain
+                round
+                @click="goToEdit(place._id, $event)"
+              >
+                编辑
+              </van-button>
+              <van-button
+                size="small"
+                type="danger"
+                plain
+                round
+                @click="onDelete(place._id, $event)"
+              >
+                删除
+              </van-button>
+            </div>
+          </div>
         </div>
-
+        
         <van-empty
           v-else
           image="search"
-          description="暂无符合条件的美食内容"
-        />
+          description="还没有收藏任何地点"
+        >
+          <van-button
+            round
+            type="primary"
+            class="bottom-button"
+            @click="$router.push('/add')"
+          >
+            去添加第一个地点
+          </van-button>
+        </van-empty>
       </van-list>
     </van-pull-refresh>
-
-    <van-dialog
-      v-model:show="showRandomDialog"
-      title="随缘一吃"
-      :show-confirm-button="false"
-      class="random-dialog"
-    >
-      <div v-if="randomPlace" class="random-place-card">
-        <div class="random-place-card__cover" :style="buildCoverStyle(randomPlace)">
-          <span class="random-place-card__city">{{ randomPlace.city }}</span>
-        </div>
-
-        <div class="random-place-card__content">
-          <h3>{{ randomPlace.name }}</h3>
-          <p class="random-place-card__address">
-            <i class="fa-solid fa-location-dot"></i>
-            {{ randomPlace.address }}
-          </p>
-
-          <div v-if="randomPlace.tags?.length" class="random-place-card__tags">
-            <van-tag
-              v-for="tag in randomPlace.tags"
-              :key="tag"
-"
-              type="primary"
-              size="small"
-            >
-              {{ tag }}
-            </van-tag>
-          </div>
-
-          <div class="random-place-card__rating" v-if="randomPlace.rating">
-            <van-rate
-              :model-value="randomPlace.rating"
-              readonly
-              :size="16"
-              color="#FFD21E"
-              void-color="#C8C9CC"
-            />
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="random-dialog__actions">
-          <van-button
-            type="default"
-            @click="onRandomPlaceAction('reroll')"
-          >
-            <i class="fa-solid fa-shuffle"></i>
-            再摇一次
-          </van-button>
-          <van-button
-            type="primary"
-            @click="onRandomPlaceAction('navigate')"
-          >
-            <i class="fa-solid fa-location-dot"></i>
-            查看详情
-          </van-button>
-          <van-button
-            type="success"
-            @click="onRandomPlaceAction('checkin')"
-          >
-            <i class="fa-solid fa-check"></i>
-            标记去过
-          </van-button>
-        </div>
-      </template>
-    </van-dialog>
-  </section>
+  </div>
 </template>
 
 <style scoped>
 .home-page {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  background: #f8f8f8;
 }
 
-.home-page__toolbar {
+/* 固定的顶部搜索栏 */
+.header {
+  /* position: sticky; */
+  /* top: 0; */
+  z-index: 100;
+  background: #f8f8f8;
+  margin-bottom: 12px;
+  /* padding: 12px 16px; */
+}
+
+.content {
+  height: 200px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.search-bar {
   display: flex;
-  align-items: center;
   gap: 12px;
 }
 
-.home-page__search {
+.search-bar .van-search {
   flex: 1;
   padding: 0;
 }
 
-.home-page__map-button {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: none;
-  border-radius: 50%;
-  color: #ff6b3d;
-  background: #ffffff;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-}
-
-.home-page__random {
-  padding: 0 16px;
-}
-
-.random-button {
-  width: 100%;
-  padding: 20px;
-  border: none;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #ff6b3d 0%, #ffb347 100%);
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  box-shadow: 0 4px 16px rgba(255, 107, 61, 0.3);
-  transition: transform 0.2s;
-}
-
-.random-button:active {
-  transform: scale(0.98);
-}
-
-.home-page__tabs {
-  padding: 0 16px;
-}
-
-.home-page__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px;
-}
-
-.skeleton-list,
-.post-list {
+.place-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
-.skeleton-card,
-.post-card {
+.place-card {
+  background: #fff;
+  border-radius: 12px;
   overflow: hidden;
-;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.post-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.skeletonkeleton-card {
-  padding: 0;
-}
-
-.skeleton-card :deep(.van-skeleton) {
-  display: block;
-}
-
-.skeleton-card__cover {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background: linear-gradient(135deg, rgba(255, 107, 61, 0.12), rgba(255, 179, 71, 0.22));
-}
-
-.skeleton-card__body {
-  padding: 16px;
-}
-
-.skeleton-card__title {
-  width: 60%;
-}
-
-.post-card__cover {
+.place-cover {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
+  background: #f0f0f0;
 }
 
-.post-card__city {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #ff6b3d;
-  background: rgba(255, 255, 255, 0.92);
-  font-size: 12px;
-  font-weight: 600;
+.place-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.post-card__favorited {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
+.placeholder-cover {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 50%;
-  color: #ff6b3d;
+  color: #ccc;
 }
 
-.post-card__content {
-  padding: 16px;
-}
-
-.post-card__header,
-.post-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.post-card__header h2,
-.post-card__desc,
-.post-card__location span,
-.post-card__header span,
-.post-card__stats span {
-  margin: 0;
-}
-
-.post-card__header h2 {
-  flex: 1;
-  color: #333333;
-  font-size: 18px;
-  line-height: 1.4;
-}
-
-.post-card__header span {
-  color: #999999;
+.city-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
   font-size: 12px;
-  white-space: nowrap;
+  border-radius: 4px;
 }
 
-.post-card__desc {
-  margin-top: 10px;
-  color: #666666;
-  font-size: 14px;
-  line-height: 1.6;
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.place-info {
+  padding: 12px;
 }
 
-.post-card__footer {
-  margin-top: 14px;
-  align-items: flex-end;
+.place-name {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
 }
 
-.post-card__location {
+.place-address {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #666;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: #999999;
-  font-size: 12px;
-}
-
-.post-card__location span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.post-card__stats {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #999999;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.post-card__stats span {
-  display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.random-dialog {
-  border-radius: 16px;
-}
-
-.random-place-card {
-  overflow: hidden;
-  border-radius: 12px;
-}
-
-.random-place-card__cover {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-}
-
-.random-place-card__city {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #ff6b3d;
-  background: rgba(255, 255, 255, 0.92);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.random-place
--card__content {
-  padding: 20px;
-}
-
-.random-place-card__content h3 {
-  margin: 0 0 12px;
-  color: #333333;
-  font-size: 20px;
-  line-height: 1.4;
-}
-
-.random-place-card__address {
+.place-tags {
   display: flex;
-  align-items: center;
   gap: 6px;
-  color: #666666;
-  font-size: 14px;
-  margin-bottom: 16px;
-}
-
-.random-place-card__tags {
-  display: flex;
+  margin-bottom: 8px;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
 }
 
-.random-place-card__rating {
+.place-rating {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 4px;
 }
 
-.random-dialog__actions {
+.place-actions {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 
-.random-dialog__actions .van-button {
-  width: 100%;
+.place-actions .van-button {
+  flex: 1;
+}
+
+.bottom-button {
+  margin-top: 16px;
 }
 </style>

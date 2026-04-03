@@ -1,7 +1,13 @@
 import http from './http'
 
-export const registerApi = (payload) => http.post('/auth/register', payload)
+export const login = (data) => {
+  return http.post('/auth/login', data)
+}
 
-export const loginApi = (payload) => http.post('/auth/login', payload)
+export const register = (data) => {
+  return http.post('/auth/register', data)
+}
 
-export const fetchProfileApi = () => http.get('/auth/profile')
+export const getProfile = () => {
+  return http.get('/auth/profile')
+}

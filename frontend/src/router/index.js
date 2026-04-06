@@ -54,6 +54,12 @@ const routes = [
     ],
   },
   {
+    path: '/map',
+    name: 'map',
+    component: () => import('@/views/MapView.vue'),
+    meta: { title: '地图模式' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

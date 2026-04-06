@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@amap/amap-jsapi-loader": "^1.0.1",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "axios": "^1.14.0",
     "pinia": "^3.0.4",

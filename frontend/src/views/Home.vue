@@ -143,6 +143,18 @@ onMounted(() => {
           {{ selectedCity || '城市' }}
         </van-button>
       </div>
+      <!-- 地图模式入口 -->
+      <div class="map-entry">
+        <van-button
+          size="small"
+          type="default"
+          round
+          icon="map-marked"
+          @click="$router.push('/map')"
+        >
+          地图模式
+        </van-button>
+      </div>
     </div>
 
     <!-- 城市选择器 -->

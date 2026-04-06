@@ -7,6 +7,7 @@ const placesStore = usePlacesStore()
 
 let map = null
 let markers = []
+let A = null
 const selectedPlace = ref(null)
 const showPlaceCard = ref(false)
 
@@ -47,7 +48,8 @@ onMounted(async () => {
     version: '2.0',
     plugins: ['AMap.Scale', 'AMap.ToolBar']
   })
-    .then(async (AMap) => {
+    .then(async (AMapInstance) => {
+      A = AMapInstance
       let center = [116.397428, 39.90923]
 
       try {
@@ -58,14 +60,14 @@ onMounted(async () => {
         console.log('获取位置失败，使用默认中心:', error)
       }
 
-      map = new AMap.Map('container', {
+      map = new A.Map('container', {
         viewMode: '2D',
         zoom: 11,
         center: center
       })
 
-      map.addControl(new AMap.Scale())
-      map.addControl(new AMap.ToolBar({
+      map.addControl(new A.Scale())
+      map.addControl(new A.ToolBar({
         position: 'RB'
       }))
 
@@ -76,7 +78,7 @@ onMounted(async () => {
       places.forEach((place) => {
         if (place.location?.lat && place.location?.lng) {
           const position = [place.location.lng, place.location.lat]
-            const marker = new AMap.Marker({
+            const marker = new A.Marker({
               position: position,
               title: place.name,
               extData: place,

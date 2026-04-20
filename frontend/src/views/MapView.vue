@@ -44,7 +44,7 @@ const closePlaceCard = () => {
 
 onMounted(async () => {
   AMapLoader.load({
-    key: 'eb61e5f53014f0ca023a5fd2e01c6716',
+    key: '3bc4a8fb4398ccef75e646555b4fb37d',
     version: '2.0',
     plugins: ['AMap.Scale', 'AMap.ToolBar']
   })

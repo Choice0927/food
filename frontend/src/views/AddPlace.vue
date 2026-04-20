@@ -1,8 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import { usePlacesStore } from '@/stores/places'
+import AMapLoader from '@amap/amap-jsapi-loader'
+import { searchPOI, regeoCode } from '@/api/amap'
+import CityPicker from '@/components/CityPicker.vue'
 
 const router = useRouter()
 const placesStore = usePlacesStore()
@@ -51,40 +54,321 @@ const showCityPicker = ref(false)
 const showTagPicker = ref(false)
 const loading = ref(false)
 
-const onCityConfirm = ({ selectedOptions }) => {
-  formData.value.city = selectedOptions[0].value
-  showCityPicker.value = false
+// 地图搜索相关
+const searchKeyword = ref('')
+const searchResults = ref([])
+const showSearchPanel = ref(false)
+const A = ref(null)
+const map = ref(null)
+const currentMarker = ref(null)
+const infoWindow = ref(null)
+
+onMounted(() => {
+  initAMap()
+})
+
+onUnmounted(() => {
+  if (map.value) {
+    map.value.destroy()
+  }
+})
+
+// 获取当前位置并初始化地图
+const initAMap = async () => {
+  try {
+    const AMapInstance = await AMapLoader.load({
+      key: 'eb61e5f53014f0ca023a5fd2e01c6716',
+      version: '2.0',
+      plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Marker', 'AMap.InfoWindow', 'AMap.Geolocation']
+    })
+    
+    A.value = AMapInstance
+    
+    // 初始化地图（默认北京，后面会获取当前位置更新）
+    map.value = new AMapInstance.Map('searchMapContainer', {
+      zoom: 12,
+      center: [116.397428, 39.90923]
+    })
+    
+    // 添加地图控件
+    map.value.addControl(new AMapInstance.Scale())
+    map.value.addControl(new AMapInstance.ToolBar({
+      position: 'RB'
+    }))
+    
+    // 尝试获取当前位置并设置地图中心
+    getLocation()
+    
+  } catch (error) {
+    console.error('地图加载失败:', error)
+    showFailToast('地图加载失败')
+  }
 }
 
-const onTagConfirm = ({ selectedOptions }) => {
-  formData.value.tags = selectedOptions.map((option) => option.value)
-  showTagPicker.value = false
+// 获取当前位置并更新地图
+const getCurrentLocation = () => {
+  if (!navigator.geolocation) {
+    console.log('浏览器不支持地理定位')
+    return
+  }
+  
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const { latitude, longitude } = position.coords
+      
+      // 更新表单坐标
+      formData.value.latitude = latitude
+      formData.value.longitude = longitude
+      
+      // 更新地图中心
+      if (map.value && A.value) {
+        const lnglat = [longitude, latitude]
+        map.value.setCenter(lnglat)
+        
+        // 添加当前位置标记
+        if (currentMarker.value) {
+          currentMarker.value.setMap(null)
+        }
+        
+        currentMarker.value = new A.value.Marker({
+          position: lnglat,
+          title: '当前位置',
+          animation: 'AMAP_ANIMATION_DROP'
+        })
+        currentMarker.value.setMap(map.value)
+        
+        // 添加信息窗
+        if (infoWindow.value) {
+          infoWindow.value.close()
+        }
+        
+        infoWindow.value = new A.value.InfoWindow({
+          content: '<div style="padding:8px;"><strong>当前位置</strong></div>',
+          offset: new A.value.Pixel(0, -30)
+        })
+        infoWindow.value.open(map.value, lnglat)
+      }
+      
+      // 获取地址信息
+      try {
+        const result = await regeoCode(`${longitude},${latitude}`)
+        if (result.success) {
+          formData.value.city = result.city || ''
+          formData.value.address = result.address || ''
+        }
+      } catch (error) {
+        console.error('获取地址信息失败:', error)
+      }
+    },
+    (error) => {
+      console.error('获取位置失败:', error)
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  )
 }
 
+// 获取当前位置并更新地图
 const getLocation = () => {
   if (!navigator.geolocation) {
     showFailToast('您的浏览器不支持定位功能')
     return
   }
 
-  showLoadingToast({
+  const loadingToast = showLoadingToast({
     message: '获取位置中...',
     forbidClick: true,
     duration: 0,
   })
 
   navigator.geolocation.getCurrentPosition(
-    (position) => {
+    async (position) => {
       const { latitude, longitude } = position.coords
+
+      // 更新表单坐标
       formData.value.latitude = latitude
       formData.value.longitude = longitude
-      showSuccessToast('位置获取成功')
+
+      // 更新地图中心
+      if (map.value && A.value) {
+        const lnglat = [longitude, latitude]
+        map.value.setCenter(lnglat)
+        map.value.setZoom(16)
+
+        // 添加当前位置标记
+        if (currentMarker.value) {
+          currentMarker.value.setMap(null)
+        }
+
+        currentMarker.value = new A.value.Marker({
+          position: lnglat,
+          title: '当前位置',
+          animation: 'AMAP_ANIMATION_DROP'
+        })
+        currentMarker.value.setMap(map.value)
+
+        // 添加信息窗
+        if (infoWindow.value) {
+          infoWindow.value.close()
+        }
+
+        infoWindow.value = new A.value.InfoWindow({
+          content: '<div style="padding:8px;"><strong>当前位置</strong></div>',
+          offset: new A.value.Pixel(0, -30)
+        })
+        infoWindow.value.open(map.value, lnglat)
+      }
+
+      // 获取地址信息
+      try {
+        const result = await regeoCode(`${longitude},${latitude}`)
+        if (result.success) {
+          formData.value.city = result.city || ''
+          formData.value.address = result.address || ''
+          loadingToast.close()
+        } else {
+          loadingToast.close()
+          showFailToast('获取地址信息失败')
+        }
+      } catch (error) {
+        console.error('获取地址信息失败:', error)
+        loadingToast.close()
+        showFailToast('获取地址信息失败')
+      }
     },
     (error) => {
+      console.error('获取位置失败:', error)
+      loadingToast.close()
       showFailToast('获取位置失败，请检查定位权限')
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   )
+}
+
+// 防抖函数
+let searchTimeout = null
+const debounceSearch = (fn, delay = 500) => {
+  return (...args) => {
+    if (searchTimeout) clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => fn(...args), delay)
+  }
+}
+
+const onSearchInput = debounceSearch(async () => {
+  if (!searchKeyword.value.trim()) {
+    searchResults.value = []
+    showSearchPanel.value = false
+    return
+  }
+  
+  try {
+    // 使用高德Web服务API搜索POI
+    const result = await searchPOI({
+      keywords: searchKeyword.value,
+      city: formData.value.city || '',
+      offset: 10
+    })
+    
+    console.log('搜索结果:', result)
+    
+    if (result.success && result.pois.length > 0) {
+      // 处理搜索结果
+      searchResults.value = result.pois.map(poi => ({
+        id: poi.id,
+        name: poi.name,
+        address: poi.address || '',
+        district: (poi.pname || '') + (poi.cityname || '') + (poi.adname || ''),
+        location: poi.location ? poi.location.split(',').map(Number) : null,
+        type: poi.type,
+        tel: poi.tel || ''
+      })).filter(item => item.location && item.location.length === 2)
+      
+      showSearchPanel.value = searchResults.value.length > 0
+      
+      if (searchResults.value.length === 0) {
+        showFailToast('未找到相关地点')
+      }
+    } else {
+      searchResults.value = []
+      showSearchPanel.value = false
+      showFailToast(result.error || '未找到相关地点')
+    }
+  } catch (error) {
+    console.error('搜索失败:', error)
+    showFailToast('搜索出错')
+  }
+}, 500)
+
+const onSelectPlace = (place) => {
+  console.log('选中地点:', place)
+  
+  // 更新表单数据
+  formData.value.name = place.name || ''
+  formData.value.address = place.address || ''
+  formData.value.latitude = place.location[1]
+  formData.value.longitude = place.location[0]
+  
+  // 根据城市更新选择
+  const cityMatch = cities.find(c => place.district?.includes(c.value))
+  if (cityMatch) {
+    formData.value.city = cityMatch.value
+  } else {
+    // 尝试从district中提取城市
+    const cityList = ['北京', '上海', '广州', '深圳', '杭州', '成都', '重庆', '武汉', '西安', '南京']
+    for (const city of cityList) {
+      if (place.district?.includes(city)) {
+        formData.value.city = city
+        break
+      }
+    }
+  }
+  
+  // 更新地图中心并标记
+  if (map.value && place.location) {
+    const lnglat = place.location
+    map.value.setCenter(lnglat)
+    map.value.setZoom(17)
+    
+    // 清除之前的标记
+    if (currentMarker.value) {
+      currentMarker.value.setMap(null)
+    }
+    
+    // 关闭之前的信息窗
+    if (infoWindow.value) {
+      infoWindow.value.close()
+    }
+    
+    // 添加新标记
+    currentMarker.value = new A.value.Marker({
+      position: lnglat,
+      title: place.name,
+      animation: 'AMAP_ANIMATION_DROP'
+    })
+    currentMarker.value.setMap(map.value)
+    
+    // 添加信息窗
+    infoWindow.value = new A.value.InfoWindow({
+      content: `<div style="padding:8px;"><strong>${place.name}</strong><br/>${place.address || ''}</div>`,
+      offset: new A.value.Pixel(0, -30)
+    })
+    infoWindow.value.open(map.value, lnglat)
+  }
+  
+  // 关闭搜索面板
+  showSearchPanel.value = false
+  searchKeyword.value = place.name
+  
+  showSuccessToast('已选择：' + place.name)
+}
+
+const onCitySelect = (city) => {
+  formData.value.city = city.name
+  showCityPicker.value = false
+}
+
+const onTagConfirm = ({ selectedOptions }) => {
+  formData.value.tags = selectedOptions.map((option) => option.value)
+  showTagPicker.value = false
 }
 
 const validateForm = () => {
@@ -130,6 +414,40 @@ const handleSubmit = async () => {
       placeholder
     />
 
+    <!-- 地图搜索区域 -->
+    <div class="map-search-section">
+      <div class="search-input-wrapper">
+        <van-search
+          v-model="searchKeyword"
+          placeholder="搜索美食店、餐厅名称，如：海底捞、星巴克"
+          shape="round"
+          :clearable="true"
+          @input="onSearchInput"
+        />
+      </div>
+      
+      <!-- 搜索结果列表 -->
+      <div v-if="showSearchPanel" class="search-results-panel">
+        <van-list>
+          <van-cell
+            v-for="place in searchResults"
+            :key="place.id"
+            :title="place.name"
+            :label="place.district + place.address"
+            clickable
+            @click="onSelectPlace(place)"
+          >
+            <template #icon>
+              <van-icon name="location-o" class="place-icon" />
+            </template>
+          </van-cell>
+        </van-list>
+      </div>
+      
+      <!-- 地图容器 -->
+      <div id="searchMapContainer" class="search-map-container"></div>
+    </div>
+
     <van-form @submit="handleSubmit" class="form">
       <van-cell-group inset>
         <van-field
@@ -149,7 +467,14 @@ const handleSubmit = async () => {
           placeholder="请选择城市"
           :rules="[{ required: true, message: '请选择城市' }]"
           @click="showCityPicker = true"
-        />
+        >
+          <template #button>
+            <van-button size="small" type="primary" @click.stop="showCityPicker = true">
+              <van-icon name="location-o" />
+              选择
+            </van-button>
+          </template>
+        </van-field>
 
         <van-field
           v-model="formData.address"
@@ -228,11 +553,12 @@ const handleSubmit = async () => {
     </van-form>
 
     <!-- 城市选择器 -->
-    <van-popup v-model:show="showCityPicker" position="bottom" round>
-      <van-picker
-        :columns="cities"
-        @confirm="onCityConfirm"
+    <van-popup v-model:show="showCityPicker" position="bottom" round style="height: 80%;">
+      <CityPicker 
+        @select="onCitySelect" 
         @cancel="showCityPicker = false"
+        :show-cascade="true"
+        default-mode="list"
       />
     </van-popup>
 
@@ -278,5 +604,42 @@ const handleSubmit = async () => {
 
 .form-footer {
   margin: 24px 16px;
+}
+
+/* 地图搜索区域样式 */
+.map-search-section {
+  background: #fff;
+  padding: 12px 16px;
+  position: relative;
+}
+
+.search-input-wrapper {
+  margin-bottom: 12px;
+}
+
+.search-map-container {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.search-results-panel {
+  position: absolute;
+  top: 70px;
+  left: 16px;
+  right: 16px;
+  max-height: 300px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 999;
+  overflow-y: auto;
+}
+
+.place-icon {
+  margin-right: 8px;
+  color: #ff6b3d;
+  font-size: 18px;
 }
 </style>

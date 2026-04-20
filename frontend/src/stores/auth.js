@@ -1,8 +1,42 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-const TOKEN_KEY = 'food-travel-token'
-const USER_KEY = 'food-travel-user'
+export const TOKEN_KEY = 'food-travel-token'
+export const USER_KEY = 'food-travel-user'
+
+const decodeTokenPayload = (token) => {
+  const [, payload] = token.split('.')
+  const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
+  const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=')
+  return JSON.parse(atob(paddedPayload))
+}
+
+export const clearStoredAuth = () => {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+export const getStoredToken = () => {
+  const storedToken = localStorage.getItem(TOKEN_KEY) || ''
+
+  if (!storedToken) {
+    return ''
+  }
+
+  try {
+    const payload = decodeTokenPayload(storedToken)
+
+    if (payload.exp && payload.exp * 1000 <= Date.now()) {
+      clearStoredAuth()
+      return ''
+    }
+
+    return storedToken
+  } catch {
+    clearStoredAuth()
+    return ''
+  }
+}
 
 const parseUser = () => {
   const rawUser = localStorage.getItem(USER_KEY)
@@ -14,13 +48,13 @@ const parseUser = () => {
   try {
     return JSON.parse(rawUser)
   } catch {
-    localStorage.removeItem(USER_KEY)
+    clearStoredAuth()
     return null
   }
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem(TOKEN_KEY) || '')
+  const token = ref(getStoredToken())
   const user = ref(parseUser())
   const isAuthenticated = computed(() => Boolean(token.value))
 
@@ -34,8 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
   const clearAuth = () => {
     token.value = ''
     user.value = null
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
+    clearStoredAuth()
   }
 
   return {

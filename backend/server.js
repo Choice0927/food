@@ -1,16 +1,21 @@
 require('dotenv').config()
 
-const app = require('./app')
 const connectDB = require('./config/db')
 
 const PORT = process.env.PORT || 5000
 
 const bootstrap = async () => {
-  await connectDB()
+  try {
+    await connectDB()
+    const app = require('./app')
 
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`)
-  })
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`)
+    })
+  } catch (error) {
+    console.error(`MongoDB connection failed: ${error.message}`)
+    process.exit(1)
+  }
 }
 
 bootstrap()

@@ -32,6 +32,9 @@ import {
   Checkbox,
   Radio,
   Uploader,
+  Cascader,
+  IndexBar,
+  IndexAnchor,
 } from 'vant'
 
 // Vant 样式
@@ -71,6 +74,9 @@ const vantComponents = [
   Checkbox,
   Radio,
   Uploader,
+  Cascader,
+  IndexBar,
+  IndexAnchor,
 ]
 
 vantComponents.forEach((component) => {

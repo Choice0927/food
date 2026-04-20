@@ -1,4 +1,7 @@
 import axios from 'axios'
+import router from '@/router'
+import { pinia } from '@/stores'
+import { getStoredToken, useAuthStore } from '@/stores/auth'
 
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -6,7 +9,7 @@ const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('food-travel-token')
+  const token = getStoredToken()
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -19,8 +22,18 @@ http.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('food-travel-token')
-      localStorage.removeItem('food-travel-user')
+      const authStore = useAuthStore(pinia)
+      const currentRoute = router.currentRoute.value
+      const isPublicRoute = currentRoute.matched.some((record) => record.meta.public)
+
+      authStore.clearAuth()
+
+      if (!isPublicRoute) {
+        router.replace({
+          path: '/login',
+          query: currentRoute.fullPath ? { redirect: currentRoute.fullPath } : undefined,
+        })
+      }
     }
 
     return Promise.reject(error)

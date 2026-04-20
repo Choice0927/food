@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog } from 'vant'
 import { useAuthStore } from '@/stores/auth'
@@ -7,6 +7,11 @@ import { useAuthStore } from '@/stores/auth'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const tabRoutes = {
+  home: '/home',
+  add: '/add',
+  profile: '/profile',
+}
 
 const activeTab = computed(() => {
   const path = route.path
@@ -16,18 +21,12 @@ const activeTab = computed(() => {
   return 'home'
 })
 
-const onTabChange = (index) => {
-  const tabs = ['home', 'add', 'profile']
-  const tab = tabs[index]
-  if (tab === 'add') {
-    router.push('/add')
-  } else {
-    router.push(`/${tab}`)
-  }
-}
+const onTabChange = (name) => {
+  const targetPath = tabRoutes[name]
 
-const onClickAdd = () => {
-  router.push('/add')
+  if (targetPath && targetPath !== route.path) {
+    router.push(targetPath)
+  }
 }
 
 const onLogout = () => {
@@ -49,17 +48,16 @@ const onLogout = () => {
       <router-view />
     </main>
 
-    <van-tabbar v-model="activeTab" @change="onTabChange" class="tabbar">
+    <van-tabbar :model-value="activeTab" @change="onTabChange" class="tabbar">
       <van-tabbar-item name="home" icon="home-o">
         我的收藏
       </van-tabbar-item>
-      <van-tabbar-item @click="onClickAdd">
+      <van-tabbar-item name="add">
         <template #icon>
           <div class="add-btn">
             <van-icon name="plus" />
           </div>
         </template>
-        <span class="add-text">添加</span>
       </van-tabbar-item>
       <van-tabbar-item name="profile" icon="user-o">
         我的
@@ -96,7 +94,6 @@ const onLogout = () => {
   border-radius: 50%;
   color: #fff;
   font-size: 20px;
-  transform: translateY(-8px);
   box-shadow: 0 4px 12px rgba(255, 107, 61, 0.4);
 }
 

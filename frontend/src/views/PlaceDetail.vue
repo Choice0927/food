@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast, showConfirmDialog } from 'vant'
 import { getPlaceDetailApi, deletePlaceApi } from '@/api/places'
+import AMapLoader from '@amap/amap-jsapi-loader'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +13,12 @@ const place = ref(null)
 const loading = ref(true)
 const currentImageIndex = ref(0)
 const showImagePreview = ref(false)
+
+// 地图相关
+const A = ref(null)
+const map = ref(null)
+const marker = ref(null)
+const infoWindow = ref(null)
 
 const fetchPlaceDetail = async () => {
   loading.value = true
@@ -57,8 +64,74 @@ const openImagePreview = (index) => {
   showImagePreview.value = true
 }
 
+// 初始化地图
+const initMap = async () => {
+  if (!place.value?.location?.lat || !place.value?.location?.lng) {
+    console.log('暂无位置信息，无法显示地图')
+    return
+  }
+
+  try {
+    const AMapInstance = await AMapLoader.load({
+      key: 'eb61e5f53014f0ca023a5fd2e01c6716',
+      version: '2.0',
+      plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Marker', 'AMap.InfoWindow']
+    })
+
+    A.value = AMapInstance
+
+    const lnglat = [place.value.location.lng, place.value.location.lat]
+
+    // 初始化地图
+    map.value = new AMapInstance.Map('detailMapContainer', {
+      zoom: 16,
+      center: lnglat
+    })
+
+    // 添加控件
+    map.value.addControl(new AMapInstance.Scale())
+    map.value.addControl(new AMapInstance.ToolBar({
+      position: 'RB'
+    }))
+
+    // 添加标记
+    marker.value = new AMapInstance.Marker({
+      position: lnglat,
+      title: place.value.name,
+      animation: 'AMAP_ANIMATION_DROP'
+    })
+    marker.value.setMap(map.value)
+
+    // 添加信息窗
+    infoWindow.value = new AMapInstance.InfoWindow({
+      content: `<div style="padding:8px;"><strong>${place.value.name}</strong><br/>${place.value.address || ''}</div>`,
+      offset: new AMapInstance.Pixel(0, -30)
+    })
+    infoWindow.value.open(map.value, lnglat)
+
+  } catch (error) {
+    console.error('地图加载失败:', error)
+  }
+}
+
+// 监听 place 数据变化，加载地图
+watch(() => place.value, (newPlace) => {
+  if (newPlace?.location?.lat && newPlace?.location?.lng) {
+    // 延迟初始化地图，确保 DOM 已渲染
+    setTimeout(() => {
+      initMap()
+    }, 100)
+  }
+}, { immediate: false })
+
 onMounted(() => {
   fetchPlaceDetail()
+})
+
+onUnmounted(() => {
+  if (map.value) {
+    map.value.destroy()
+  }
 })
 </script>
 
@@ -89,6 +162,11 @@ onMounted(() => {
               <img :src="image" :alt="place.name" class="gallery-image">
             </van-swipe-item>
           </van-swipe>
+        </div>
+
+        <!-- 地图 -->
+        <div v-if="place.location?.lat && place.location?.lng" class="map-section">
+          <div id="detailMapContainer" class="detail-map-container"></div>
         </div>
 
         <!-- 基本信息 -->
@@ -182,6 +260,19 @@ onMounted(() => {
 
 .image-gallery {
   background: #fff;
+}
+
+.map-section {
+  background: #fff;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.detail-map-container {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .gallery-image {

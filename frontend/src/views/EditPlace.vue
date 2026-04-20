@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import { getPlaceDetailApi, updatePlaceApi } from '@/api/places'
+import AMapLoader from '@amap/amap-jsapi-loader'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,6 +35,12 @@ const showCityPicker = ref(false)
 const showTagPicker = ref(false)
 const loading = ref(false)
 const pageLoading = ref(true)
+
+// 地图相关
+const A = ref(null)
+const map = ref(null)
+const marker = ref(null)
+const infoWindow = ref(null)
 
 const fetchPlaceDetail = async () => {
   try {
@@ -86,7 +93,6 @@ const getLocation = () => {
       const { latitude, longitude } = position.coords
       formData.value.latitude = latitude
       formData.value.longitude = longitude
-      showSuccessToast('位置获取成功')
     },
     (error) => {
       showFailToast('获取位置失败，请检查定位权限')
@@ -127,8 +133,74 @@ const handleSubmit = async () => {
   }
 }
 
+// 初始化地图
+const initMap = async () => {
+  if (!formData.value.latitude || !formData.value.longitude) {
+    console.log('暂无位置信息，无法显示地图')
+    return
+  }
+
+  try {
+    const AMapInstance = await AMapLoader.load({
+      key: 'eb61e5f53014f0ca023a5fd2e01c6716',
+      version: '2.0',
+      plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Marker', 'AMap.InfoWindow']
+    })
+
+    A.value = AMapInstance
+
+    const lnglat = [formData.value.longitude, formData.value.latitude]
+
+    // 初始化地图
+    map.value = new AMapInstance.Map('editMapContainer', {
+      zoom: 16,
+      center: lnglat
+    })
+
+    // 添加控件
+    map.value.addControl(new AMapInstance.Scale())
+    map.value.addControl(new AMapInstance.ToolBar({
+      position: 'RB'
+    }))
+
+    // 添加标记
+    marker.value = new AMapInstance.Marker({
+      position: lnglat,
+      title: formData.value.name,
+      animation: 'AMAP_ANIMATION_DROP'
+    })
+    marker.value.setMap(map.value)
+
+    // 添加信息窗
+    infoWindow.value = new AMapInstance.InfoWindow({
+      content: `<div style="padding:8px;"><strong>${formData.value.name}</strong><br/>${formData.value.address || ''}</div>`,
+      offset: new AMapInstance.Pixel(0, -30)
+    })
+    infoWindow.value.open(map.value, lnglat)
+
+  } catch (error) {
+    console.error('地图加载失败:', error)
+  }
+}
+
+// 监听 formData 变化，加载地图
+watch(() => formData.value.latitude, (newLat) => {
+  if (newLat && formData.value.longitude && !map.value) {
+    // 延迟初始化地图，确保 DOM 已渲染
+    setTimeout(() => {
+      initMap()
+    }, 100)
+  }
+}, { immediate: false })
+
 onMounted(() => {
   fetchPlaceDetail()
+})
+
+onUnmounted(() => {
+  if (map.value) {
+    map.value.destroy()
+  }
 })
 </script>
 
@@ -143,6 +215,11 @@ onMounted(() => {
     />
 
     <van-skeleton :row="10" :loading="pageLoading">
+      <!-- 地图区域 -->
+      <div v-if="formData.latitude && formData.longitude" class="map-section">
+        <div id="editMapContainer" class="edit-map-container"></div>
+      </div>
+
       <van-form @submit="handleSubmit" class="form">
         <van-cell-group inset>
           <van-field
@@ -267,6 +344,19 @@ onMounted(() => {
   min-height: 100vh;
   background: #f8f8f8;
   padding-bottom: 100px;
+}
+
+.map-section {
+  background: #fff;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.edit-map-container {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .form {

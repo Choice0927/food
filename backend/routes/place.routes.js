@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const Place = require('../models/Place')
 const auth = require('../middleware/auth.middleware')
+const upload = require('../middleware/upload.middleware')
 
 // @route   GET /api/places
 // @desc    获取当前用户的地点列表
@@ -222,6 +223,41 @@ router.delete('/places/:id', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: '删除地点失败'
+    })
+  }
+})
+
+// @route   POST /api/places/upload
+// @desc    上传图片
+// @access  Private
+router.post('/places/upload', auth, upload.array('images', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '没有上传文件'
+      })
+    }
+
+    // 构建文件URL数组
+    const imageUrls = req.files.map(file => {
+      // 返回相对路径，前端使用时拼接基础URL
+      return `/uploads/${file.filename}`
+    })
+
+    res.json({
+      success: true,
+      message: '上传成功',
+      data: {
+        urls: imageUrls,
+        count: imageUrls.length
+      }
+    })
+  } catch (error) {
+    console.error('Upload error:', error)
+    res.status(500).json({
+      success: false,
+      message: '上传失败'
     })
   }
 })

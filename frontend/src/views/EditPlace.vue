@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import { getPlaceDetailApi, updatePlaceApi } from '@/api/places'
+import { uploadImagesApi } from '@/api/upload'
 import AMapLoader from '@amap/amap-jsapi-loader'
 
 const route = useRoute()
@@ -36,6 +37,10 @@ const showTagPicker = ref(false)
 const loading = ref(false)
 const pageLoading = ref(true)
 
+// 图片上传相关
+const fileList = ref([])
+const uploading = ref(false)
+
 // 地图相关
 const A = ref(null)
 const map = ref(null)
@@ -46,7 +51,7 @@ const fetchPlaceDetail = async () => {
   try {
     const { data } = await getPlaceDetailApi(placeId)
     const place = data.data
-    
+
     formData.value = {
       name: place.name || '',
       city: place.city || '',
@@ -57,6 +62,14 @@ const fetchPlaceDetail = async () => {
       images: place.images || [],
       tags: place.tags || [],
       rating: place.rating || 0,
+    }
+
+    // 初始化图片列表
+    if (place.images && place.images.length > 0) {
+      fileList.value = place.images.map(url => ({
+        url,
+        status: 'done'
+      }))
     }
   } catch (error) {
     showFailToast('获取详情失败')
@@ -74,6 +87,63 @@ const onCityConfirm = ({ selectedOptions }) => {
 const onTagConfirm = ({ selectedOptions }) => {
   formData.value.tags = selectedOptions.map((option) => option.value)
   showTagPicker.value = false
+}
+
+// 图片上传相关函数
+const onBeforeRead = (file) => {
+  // 检查文件类型
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    showFailToast('只支持 JPG、PNG、GIF、WEBP 格式的图片')
+    return false
+  }
+  // 检查文件大小 (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showFailToast('图片大小不能超过 5MB')
+    return false
+  }
+  return true
+}
+
+const onAfterRead = async (file) => {
+  // 单文件上传
+  const filesToUpload = Array.isArray(file) ? file : [file]
+
+  for (const item of filesToUpload) {
+    item.status = 'uploading'
+    item.message = '上传中...'
+
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append('images', item.file)
+
+      const { data } = await uploadImagesApi(formDataUpload)
+
+      if (data.success && data.data.urls.length > 0) {
+        item.status = 'done'
+        item.message = '上传成功'
+        item.url = data.data.urls[0]
+
+        // 更新表单数据中的图片数组
+        formData.value.images.push(data.data.urls[0])
+      } else {
+        throw new Error(data.message || '上传失败')
+      }
+    } catch (error) {
+      console.error('上传失败:', error)
+      item.status = 'failed'
+      item.message = '上传失败'
+      showFailToast(error.message || '上传失败')
+    }
+  }
+}
+
+const onDeleteImage = (file, detail) => {
+  // 从表单数据中移除图片
+  const index = formData.value.images.indexOf(file.url)
+  if (index > -1) {
+    formData.value.images.splice(index, 1)
+  }
 }
 
 const getLocation = () => {
@@ -268,6 +338,23 @@ onUnmounted(() => {
             show-word-limit
           />
 
+          <!-- 图片上传 -->
+          <van-cell title="图片" class="uploader-cell">
+            <template #value>
+              <van-uploader
+                v-model="fileList"
+                :max-count="5"
+                :max-size="5 * 1024 * 1024"
+                :before-read="onBeforeRead"
+                :after-read="onAfterRead"
+                @delete="onDeleteImage"
+                upload-text="上传图片"
+                accept="image/*"
+                multiple
+              />
+            </template>
+          </van-cell>
+
           <van-field
             readonly
             clickable
@@ -382,5 +469,16 @@ onUnmounted(() => {
 
 .form-footer {
   margin: 24px 16px;
+}
+
+/* 图片上传样式 */
+.uploader-cell :deep(.van-cell__value) {
+  flex: 1;
+  text-align: left;
+}
+
+.uploader-cell :deep(.van-uploader__upload) {
+  background-color: #f8f8f8;
+  border: 1px dashed #d9d9d9;
 }
 </style>

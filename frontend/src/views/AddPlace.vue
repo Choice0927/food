@@ -682,7 +682,7 @@ const handleSubmit = async () => {
 }
 
 .form-footer {
-  margin: 24px 16px;
+  margin: 10px;
 }
 
 /* 地图搜索区域样式 */

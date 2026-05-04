@@ -21,6 +21,10 @@ const activeTab = computed(() => {
   return 'home'
 })
 
+const showTabbar = computed(() => {
+  return route.meta.showTabbar !== false
+})
+
 const onTabChange = (name) => {
   const targetPath = tabRoutes[name]
 
@@ -44,11 +48,11 @@ const onLogout = () => {
 
 <template>
   <div class="main-layout">
-    <main class="main-content">
+    <main class="main-content" :class="{ 'no-tabbar': !showTabbar }">
       <router-view />
     </main>
 
-    <van-tabbar :model-value="activeTab" @change="onTabChange" class="tabbar">
+    <van-tabbar v-if="showTabbar" :model-value="activeTab" @change="onTabChange" class="tabbar">
       <van-tabbar-item name="home" icon="home-o">
         我的收藏
       </van-tabbar-item>
@@ -77,7 +81,13 @@ const onLogout = () => {
 .main-content {
   flex: 1 1 auto;
   height: 200px;
-  padding: 16px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content.no-tabbar {
+  padding-bottom: 0;
 }
 
 .tabbar {

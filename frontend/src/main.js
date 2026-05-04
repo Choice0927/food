@@ -1,7 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import { pinia } from './stores'
+import { pinia } from '@/stores'
+import { setupStatusBar } from '@/utils/statusbar'
+import { initBackButtonHandler } from '@/utils/back-handler'
 
 // Vant 组件库
 import {
@@ -27,6 +29,7 @@ import {
   Popup,
   Swipe,
   SwipeItem,
+  SwipeCell,
   ImagePreview,
   Dialog,
   Checkbox,
@@ -42,6 +45,8 @@ import 'vant/lib/index.css'
 
 // 全局样式
 import './style.css'
+// 移动端适配样式
+import './styles/mobile-adapter.css'
 
 const app = createApp(App)
 
@@ -69,6 +74,7 @@ const vantComponents = [
   Popup,
   Swipe,
   SwipeItem,
+  SwipeCell,
   ImagePreview,
   Dialog,
   Checkbox,
@@ -87,3 +93,9 @@ app.use(pinia)
 app.use(router)
 
 app.mount('#app')
+
+router.isReady().then(() => {
+  console.log('[Main] Router is ready, initializing back button handler')
+  setupStatusBar()
+  initBackButtonHandler()
+})

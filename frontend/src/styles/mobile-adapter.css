@@ -1,0 +1,373 @@
+/**
+ * 食mini App 移动端样式适配
+ * 确保 Vant 组件在移动端 App 中显示正常
+ */
+
+/* 全局移动端适配 */
+.mobile-app {
+  /* 防止触摸滚动穿透 */
+  touch-action: pan-y;
+  
+  /* 禁止文本选择 */
+  user-select: none;
+  
+  /* 设置字体 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Vant 组件移动端适配 */
+
+/* 按钮适配 */
+.van-button {
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+}
+
+.van-button:active {
+  transform: scale(0.95);
+  opacity: 0.9;
+}
+
+/* 输入框适配 */
+.van-field__control {
+  font-size: 16px; /* 防止 iOS 自动放大 */
+}
+
+.van-field__body {
+  min-height: 40px;
+}
+
+/* 对话框适配 */
+.van-dialog {
+  max-width: 90vw;
+  width: 320px;
+}
+
+.van-dialog__message {
+  font-size: 16px;
+  line-height: 1.6;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Toast 适配 */
+.van-toast {
+  font-size: 16px;
+  padding: 16px 24px;
+  max-width: 80vw;
+}
+
+/* 列表适配 */
+.van-list {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.van-cell {
+  font-size: 16px;
+}
+
+.van-cell__title {
+  font-size: 16px;
+}
+
+.van-cell__value {
+  font-size: 14px;
+}
+
+/* 滚动组件适配 */
+.van-pull-refresh {
+  touch-action: pan-y;
+}
+
+.van-swipe-cell {
+  touch-action: pan-y;
+}
+
+/* 底部导航适配 */
+.van-tabbar {
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+}
+
+.van-tabbar-item {
+  font-size: 12px;
+}
+
+/* 图片上传适配 */
+.van-uploader__preview {
+  width: 80px;
+  height: 80px;
+}
+
+.van-uploader__upload {
+  width: 80px;
+  height: 80px;
+}
+
+/* 评分组件适配 */
+.van-rate__item {
+  padding: 0 4px;
+}
+
+/* 搜索框适配 */
+.van-search {
+  padding: 8px 12px;
+}
+
+.van-search__content {
+  border-radius: 20px;
+  background: #f5f5f5;
+}
+
+/* 弹窗适配 */
+.van-popup {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.van-popup--bottom {
+  border-radius: 16px 16px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 日期选择器适配 */
+.van-picker {
+  border-radius: 16px 16px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.van-picker__toolbar {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* 加载状态适配 */
+.van-loading {
+  color: #ff6b3d;
+}
+
+.van-loading__spinner {
+  color: #ff6b3d;
+}
+
+/* 空状态适配 */
+.van-empty__description {
+  color: #999;
+  font-size: 14px;
+}
+
+/* 骨架屏适配 */
+.van-skeleton {
+  background: #f5f5f5;
+}
+
+/* 标签适配 */
+.van-tag {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* 面板适配 */
+.van-cell-group {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.van-cell-group--inset {
+  margin: 0 12px;
+  border-radius: 12px;
+}
+
+/* 导航栏适配 */
+.van-nav-bar {
+  background: #fff !important;
+  height: 44px;
+  line-height: 44px;
+}
+
+.van-nav-bar__content {
+  background: #fff !important;
+}
+
+.van-nav-bar--fixed {
+  padding-top: constant(safe-area-inset-top) !important;
+  padding-top: env(safe-area-inset-top) !important;
+  background: #fff !important;
+}
+
+.van-nav-bar__title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.van-nav-bar__arrow {
+  font-size: 20px;
+  color: #333;
+}
+
+/* 网格适配 */
+.van-grid {
+  padding: 12px;
+}
+
+.van-grid-item__content {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 8px;
+}
+
+/* 安全区域适配 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* 去除点击高亮 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 防止长按选择 */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 允许输入框选择文本 */
+.van-field__control,
+.van-field__textarea {
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
+  user-select: auto;
+}
+
+/* 优化滚动性能 */
+.scroller {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+/* 禁止缩放 */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+
+/* 适配刘海屏 */
+@supports (padding: max(0px)) {
+  .safe-area-top {
+    padding-top: max(20px, env(safe-area-inset-top));
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+
+/* 暗黑模式适配（可选） */
+@media (prefers-color-scheme: dark) {
+  .van-dialog__message {
+    color: #fff;
+  }
+  
+  .van-cell {
+    background: #1a1a1a;
+    color: #fff;
+  }
+  
+  .van-nav-bar {
+    background: #1a1a1a;
+    color: #fff;
+  }
+}
+
+/* 优化触摸反馈 */
+.touch-feedback {
+  transition: background-color 0.2s;
+}
+
+.touch-feedback:active {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 防止页面抖动 */
+.van-popup--with-bottom-bar {
+  bottom: 50px;
+}
+
+/* 确保内容可见 */
+.van-overflow-hidden {
+  overflow: hidden;
+}
+
+/* 优化加载体验 */
+.van-skeleton {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 防止iOS橡皮筋效果 */
+html, body {
+  overscroll-behavior: none;
+}
+
+.prevent-bounce {
+  overscroll-behavior: none;
+}
+
+/* 优化触摸滚动 */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 确保固定元素可见 */
+.fixed-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 响应式字体大小 */
+@media screen and (max-width: 375px) {
+  .van-button {
+    font-size: 14px;
+  }
+  
+  .van-cell {
+    font-size: 14px;
+  }
+}
+
+@media screen and (min-width: 768px) {
+  .mobile-app {
+    max-width: 480px;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  }
+}

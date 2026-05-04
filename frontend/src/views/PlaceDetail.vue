@@ -142,7 +142,6 @@ onUnmounted(() => {
       left-arrow
       @click-left="$router.back()"
       fixed
-      placeholder
     >
       <template #right>
         <van-icon name="edit" size="18" @click="$router.push(`/edit/${placeId}`)" />
@@ -251,7 +250,12 @@ onUnmounted(() => {
 <style scoped>
 .place-detail-page {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #f8f8f8;
+  padding-top: calc(44px + constant(safe-area-inset-top));
+  padding-top: calc(44px + env(safe-area-inset-top));
+  box-sizing: border-box;
+  overscroll-behavior: none;
 }
 
 .detail-content {

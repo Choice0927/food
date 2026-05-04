@@ -1,0 +1,15 @@
+{
+  "appId": "com.eatmini.app",
+  "appName": "食mini",
+  "webDir": "dist",
+  "plugins": {
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#ff6b3d"
+    },
+    "App": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true
+    }
+  }
+}

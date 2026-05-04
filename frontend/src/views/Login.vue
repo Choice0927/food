@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { login } from '@/api/auth'
+import { clearNavigationHistory } from '@/utils/back-handler'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,6 +46,7 @@ const onSubmit = async () => {
 
     const redirect = route.query.redirect || '/home'
     router.replace(redirect)
+    clearNavigationHistory()
   } catch (error) {
     toast.close()
     showFailToast(error.response?.data?.message || '登录失败')
@@ -171,5 +173,20 @@ const onRegister = () => {
 .register-btn {
   --van-button-plain-primary-border-color: #ff6b3d;
   --van-button-plain-primary-color: #ff6b3d;
+}
+
+:deep(.van-field) {
+  align-items: center;
+}
+
+:deep(.van-field__left-icon) {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+:deep(.van-field__body) {
+  display: flex;
+  align-items: center;
 }
 </style>

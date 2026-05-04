@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { showConfirmDialog, showSuccessToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { usePlacesStore } from '@/stores/places'
+import { clearNavigationHistory } from '@/utils/back-handler'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -40,6 +41,7 @@ const onLogout = () => {
       authStore.clearAuth()
       placesStore.resetPlaces()
       router.push('/login')
+      clearNavigationHistory()
     })
     .catch(() => {})
 }

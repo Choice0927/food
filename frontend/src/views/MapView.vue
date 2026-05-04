@@ -2,6 +2,14 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import { usePlacesStore } from '@/stores/places'
+import PermissionDialog from '@/components/PermissionDialog.vue'
+import {
+  hasLocationPermission,
+  requestCorePermissions,
+  getPermissionStateText,
+  PermissionType
+} from '@/utils/permissions'
+import { showFailToast, showConfirmDialog } from 'vant'
 
 const placesStore = usePlacesStore()
 
@@ -10,6 +18,10 @@ let markers = []
 let A = null
 const selectedPlace = ref(null)
 const showPlaceCard = ref(false)
+const showPermissionDialog = ref(false)
+const permissionType = ref('location')
+const permissionDescription = ref('')
+const permissionRationale = ref('')
 
 const getCurrentPosition = () => {
   return new Promise((resolve, reject) => {
@@ -37,47 +49,108 @@ const getCurrentPosition = () => {
   })
 }
 
-const closePlaceCard = () => {
-  showPlaceCard.value = false
-  selectedPlace.value = null
+const checkAndRequestLocationPermission = async () => {
+  try {
+    // 在 App 环境中使用 Capacitor 权限
+    const hasPermission = await hasLocationPermission()
+
+    if (hasPermission) {
+      return true
+    }
+
+    // 没有权限，显示请求对话框
+    permissionType.value = 'location'
+    permissionDescription.value = '食mini 需要访问您的位置信息来显示地图和查找附近的美食地点'
+    permissionRationale.value = '定位功能用于：\n1. 显示地图上的当前位置\n2. 查找附近的美食地点\n3. 提供导航服务'
+
+    showPermissionDialog.value = true
+    return false
+  } catch (error) {
+    console.error('检查定位权限失败:', error)
+    return false
+  }
 }
 
-onMounted(async () => {
-  AMapLoader.load({
-    key: '3bc4a8fb4398ccef75e646555b4fb37d',
-    version: '2.0',
-    plugins: ['AMap.Scale', 'AMap.ToolBar']
-  })
-    .then(async (AMapInstance) => {
-      A = AMapInstance
-      let center = [116.397428, 39.90923]
+const handlePermissionConfirm = async () => {
+  try {
+    showPermissionDialog.value = false
 
-      try {
-        const position = await getCurrentPosition()
-        center = [position.lng, position.lat]
-        console.log('当前位置:', position)
-      } catch (error) {
-        console.log('获取位置失败，使用默认中心:', error)
+    // 请求核心权限（包括定位）
+    const result = await requestCorePermissions()
+
+    if (result) {
+      const locationResult = result.results[PermissionType.LOCATION]
+
+      if (locationResult.state === 'granted') {
+        showFailToast('权限已授权，请重新获取位置')
+        setTimeout(() => {
+          initializeMap()
+        }, 1000)
+      } else if (locationResult.state === 'denied') {
+        showConfirmDialog({
+          title: '权限被拒绝',
+          message: '定位权限已被拒绝。您可以在系统设置中手动开启权限。',
+          confirmButtonText: '去设置',
+          cancelButtonText: '取消'
+        }).then((action) => {
+          if (action === 'confirm') {
+            // 打开系统设置（需要安装 @capacitor/app-settings 插件）
+            showFailToast('请在系统设置中开启定位权限')
+          }
+        })
       }
+    } else {
+      showFailToast('权限请求失败，请重试')
+    }
+  } catch (error) {
+    console.error('请求权限失败:', error)
+    showFailToast('权限请求失败：' + error.message)
+  }
+}
 
-      map = new A.Map('container', {
-        viewMode: '2D',
-        zoom: 11,
-        center: center
-      })
+const initializeMap = async () => {
+  try {
+    // 检查定位权限
+    const hasPermission = await checkAndRequestLocationPermission()
+    if (!hasPermission) {
+      return
+    }
 
-      map.addControl(new A.Scale())
-      map.addControl(new A.ToolBar({
-        position: 'RB'
-      }))
+    AMapLoader.load({
+      key: '3bc4a8fb4398ccef75e646555b4fb37d',
+      version: '2.0',
+      plugins: ['AMap.Scale', 'AMap.ToolBar']
+    })
+      .then(async (AMapInstance) => {
+        A = AMapInstance
+        let center = [116.397428, 39.90923]
 
-      await placesStore.fetchPlaces({ limit: 1000 })
-      console.log('获取到的地点数据:', placesStore.places)
+        try {
+          const position = await getCurrentPosition()
+          center = [position.lng, position.lat]
+          console.log('当前位置:', position)
+        } catch (error) {
+          console.log('获取位置失败，使用默认中心:', error)
+        }
 
-      const places = placesStore.places
-      places.forEach((place) => {
-        if (place.location?.lat && place.location?.lng) {
-          const position = [place.location.lng, place.location.lat]
+        map = new A.Map('container', {
+          viewMode: '2D',
+          zoom: 11,
+          center: center
+        })
+
+        map.addControl(new A.Scale())
+        map.addControl(new A.ToolBar({
+          position: 'RB'
+        }))
+
+        await placesStore.fetchPlaces({ limit: 1000 })
+        console.log('获取到的地点数据:', placesStore.places)
+
+        const places = placesStore.places
+        places.forEach((place) => {
+          if (place.location?.lat && place.location?.lng) {
+            const position = [place.location.lng, place.location.lat]
             const marker = new A.Marker({
               position: position,
               title: place.name,
@@ -87,21 +160,33 @@ onMounted(async () => {
                 direction: 'bottom'
               }
             })
-            
+
             marker.on('click', () => {
               console.log('点击的地点:', place)
               selectedPlace.value = place
               showPlaceCard.value = true
             })
-            
+
             marker.setMap(map)
             markers.push(marker)
-        }
+          }
+        })
       })
-    })
-    .catch((e) => {
-      console.log(e)
-    })
+      .catch((e) => {
+        console.log(e)
+      })
+  } catch (error) {
+    console.error('初始化地图失败:', error)
+  }
+}
+
+const closePlaceCard = () => {
+  showPlaceCard.value = false
+  selectedPlace.value = null
+}
+
+onMounted(() => {
+  initializeMap()
 })
 
 onUnmounted(() => {
@@ -115,6 +200,14 @@ onUnmounted(() => {
 
 <template>
   <div id="container"></div>
+
+  <PermissionDialog
+    :show="showPermissionDialog"
+    :type="permissionType"
+    :description="permissionDescription"
+    :rationale="permissionRationale"
+    @confirm="handlePermissionConfirm"
+  />
 
   <transition name="slide-up">
     <div v-if="showPlaceCard && selectedPlace" class="place-card-wrapper">

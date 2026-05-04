@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, showSuccessToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { register } from '@/api/auth'
+import { clearNavigationHistory } from '@/utils/back-handler'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -78,6 +79,7 @@ const onSubmit = async () => {
     toast.close()
     showSuccessToast('注册成功')
     router.replace('/home')
+    clearNavigationHistory()
   } catch (error) {
     toast.close()
     showFailToast(error.response?.data?.message || '注册失败')
